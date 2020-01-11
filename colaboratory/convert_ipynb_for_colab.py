@@ -7,6 +7,37 @@ convert .ipynb for jupyter to that for Google Colaboratory, i.e. image files ref
 
 import os, sys, re
 
+def insert_code_cell_between_markdowns(lines, line, prefix=""):
+    lines[-1] = re.sub(r"\s*,\s*$", "", lines[-1])
+
+    lines.append(f'   ]\n  }},\n  {{\n   "cell_type": "code",\n   "metadata": {{}},\n   "source": [{prefix}')
+    lines.append(line)
+    lines.append('   ]\n  },\n  {\n   "cell_type": "markdown",\n   "metadata": {},\n   "source": [')
+
+def proc_img_line(lines, line):
+    line = re.sub(r"\s*,\s*$", "", line)
+    line = re.sub(r"'(\S+)'", r"'/nbextensions/\1'", line)
+    line = re.sub(r"\\\"(\S+)\\\"", r"\"/nbextensions/\1\"", line)
+
+    insert_code_cell_between_markdowns(lines, line, prefix='\n    "%%html\\n",')
+
+def proc_img_line2(lines, line):
+    """
+    A helper function like below is assumed to be defined in advance:
+
+    def display_image(url):
+        from IPython.display import Image, display
+        url = os.path.join(root_dir, url)
+        display(Image(url))
+    """
+
+    m = re.search(r"'(\S+)'", line)
+    if m:
+        url = m.group(1)
+        line = f'    "display_image(\\\"{url}\\\")"'
+
+    insert_code_cell_between_markdowns(lines, line)
+
 def main():
     path = sys.argv[1]
     dirname = os.path.dirname(path)
@@ -18,14 +49,7 @@ def main():
         for line in fin.readlines():
             line = line.rstrip()
             if re.search(r"img.*src", line):
-                lines[-1] = re.sub(r"\s*,\s*$", "", lines[-1])
-
-                line = re.sub(r"\s*,\s*$", "", line)
-                line = re.sub(r"'(\S+)'", r"'/nbextensions/\1'", line)
-                line = re.sub(r"\\\"(\S+)\\\"", r"\"/nbextensions/\1\"", line)
-                lines.append('   ]\n  },\n  {\n   "cell_type": "code",\n   "metadata": {},\n   "source": [\n    "%%html\\n",')
-                lines.append(line)
-                lines.append('   ]\n  },\n  {\n   "cell_type": "markdown",\n   "metadata": {},\n   "source": [')
+                proc_img_line2(lines, line)
             else:
                 lines.append(line)
     with open(out_path, "w") as fout:
