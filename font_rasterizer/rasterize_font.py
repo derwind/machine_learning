@@ -10,10 +10,11 @@ from PIL import Image
 from typing import List, Set
 
 class Rasterizer(object):
-    def __init__(self, in_font, gids, size):
+    def __init__(self, in_font, gids, size, inverse):
         self.in_font = in_font
         self.gids = self.expand_gids(gids)
         self.size = size
+        self.inverse = inverse
 
     def run(self):
         metrics = self.load_font_metrics()
@@ -34,7 +35,8 @@ class Rasterizer(object):
         Z = np.zeros( (H, W), dtype=np.ubyte )
         buff = np.array(bitmap.buffer, dtype=np.ubyte).reshape((height, width))
         Z[H-(top+shift):H-(top+shift)+height,left:left+width].flat |= buff[:,:width].flatten()
-        Z = 0xff - Z
+        if not self.inverse:
+            Z = 0xff - Z
         im = Image.fromarray(Z, mode="L")
         im.save(f"g{gid}.png", "PNG")
 
@@ -84,6 +86,7 @@ def get_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gids", dest="gids", metavar="GIDs", type=str, required=True, help="GIDs")
     parser.add_argument("--size", dest="size", metavar="SIZE", type=int, default=1000, help="size of rasterized glyphs")
+    parser.add_argument("--inverse", dest="inverse", action="store_true", help="inverse black and white")
     parser.add_argument("in_font", metavar="IN_FONT", type=str, help="input font")
 
     args = parser.parse_args()
@@ -93,7 +96,7 @@ def get_args():
 def main():
     args = get_args()
 
-    tool = Rasterizer(args.in_font, args.gids, args.size)
+    tool = Rasterizer(args.in_font, args.gids, args.size, args.inverse)
     sys.exit(tool.run())
 
 if __name__ == "__main__":
