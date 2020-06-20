@@ -19,7 +19,7 @@ class Rasterizer(object):
     def run(self):
         metrics = self.load_font_metrics()
         face = freetype.Face(self.in_font)
-        face.set_char_size(self.size*64)
+        face.set_char_size(metrics["unitsPerEm"]*64)
         for gid in self.gids:
             self.save_image(face, gid, metrics)
 
@@ -28,16 +28,17 @@ class Rasterizer(object):
     def save_image(self, face, gid, metrics):
         face.load_glyph(gid)
         bitmap = face.glyph.bitmap
-        width, height = bitmap.width, bitmap.rows
+        width, height, pitch = bitmap.width, bitmap.rows, bitmap.pitch
         left, top = face.glyph.bitmap_left, face.glyph.bitmap_top
         shift = -metrics["descender"]
         W, H = metrics["unitsPerEm"], metrics["unitsPerEm"]
         Z = np.zeros( (H, W), dtype=np.ubyte )
-        buff = np.array(bitmap.buffer, dtype=np.ubyte).reshape((height, width))
+        buff = np.array(bitmap.buffer, dtype=np.ubyte).reshape((height, pitch))
         Z[H-(top+shift):H-(top+shift)+height,left:left+width].flat |= buff[:,:width].flatten()
         if not self.inverse:
             Z = 0xff - Z
         im = Image.fromarray(Z, mode="L")
+        im = im.resize((self.size, self.size))
         im.save(f"g{gid}.png", "PNG")
 
     def load_font_metrics(self) -> dict:
