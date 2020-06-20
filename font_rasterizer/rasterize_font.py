@@ -4,38 +4,39 @@
 import sys
 import argparse
 import numpy as np
-from fontTools.ttLib import TTFont
 import freetype
 from PIL import Image
 from typing import List, Set
 
 class Rasterizer(object):
-    def __init__(self, in_font, gids, size, inverse=False, rgb=False):
+    def __init__(self, in_font:str, gids:Set[int], size:int, inverse:bool=False, rgb:bool=False):
         self.in_font = in_font
-        self.gids = self.expand_gids(gids)
+        self.gids = gids
         self.size = size
         self.inverse = inverse
         self.rgb = rgb
 
     def run(self):
-        metrics = self.load_font_metrics()
         face = freetype.Face(self.in_font)
         face.set_char_size(self.size*64) # '*64' means '<<6' (bitwise shift) because type of width is F26Dot6
         for gid in self.gids:
-            self.save_image(face, gid, metrics)
+            self.save_image(face, gid)
 
         return 0
 
-    def save_image(self, face, gid, metrics):
-        face.load_glyph(gid)
-        bitmap = face.glyph.bitmap
-        width, height, pitch = bitmap.width, bitmap.rows, bitmap.pitch
-        left, top = face.glyph.bitmap_left, face.glyph.bitmap_top
-        shift = -metrics["descender"] * self.size // metrics["unitsPerEm"]
+    def save_image(self, face, gid):
         W, H = self.size, self.size
         Z = np.zeros( (H, W), dtype=np.ubyte )
-        buff = np.array(bitmap.buffer, dtype=np.ubyte).reshape((height, pitch))
-        Z[H-(top+shift):H-(top+shift)+height,left:left+width].flat |= buff[:,:width].flatten()
+
+        face.load_glyph(gid)
+        bitmap = face.glyph.bitmap
+        x, y = face.glyph.bitmap_left, face.glyph.bitmap_top
+        w, h, p = bitmap.width, bitmap.rows, bitmap.pitch
+        shift = -face.descender * self.size // face.units_per_EM
+        y += shift
+
+        buff = np.array(bitmap.buffer, dtype=np.ubyte).reshape((h,p))
+        Z[H-y:H-y+h,x:x+w].flat |= buff[:,:w].flatten()
         if not self.inverse:
             Z = 0xff - Z
         im = Image.fromarray(Z, mode="L")
@@ -44,47 +45,15 @@ class Rasterizer(object):
         #print(np.asarray(im, np.uint8).shape)
         im.save(f"g{gid}.png", "PNG")
 
-    def load_font_metrics(self) -> dict:
-        metrics = {"unitsPerEm":0, "ascender":0, "descender":0}
-        ttFont = TTFont(self.in_font)
-        metrics["unitsPerEm"] = ttFont["head"].unitsPerEm
-        metrics["ascender"] = ttFont["OS/2"].sTypoAscender
-        metrics["descender"] = ttFont["OS/2"].sTypoDescender
-        return metrics
-
-    def expand_gids(self, gids:str) -> Set[int]:
-        gset = set()
-        for elem in gids.split(","):
-            if "-" in elem:
-                start, end = [int(s) for s in elem.split("-")]
-                gset |= set(range(start, end+1))
-            else:
-                gset.add(int(elem))
-        return gset
-
-    def compact_gids(self, gids:List[int]) -> str:
-        cgids = []
-        s = e = -1
-        for gid in sorted(gids):
-            if e < 0:
-                s = e = gid
-                continue
-
-            if gid == e + 1:
-                e = gid
-            else:
-                if s == e:
-                    cgids.append(str(s))
-                else:
-                    cgids.append("{}-{}".format(s, e))
-                s = e = gid
-
-        if s == e:
-            cgids.append(str(s))
+def expand_gids(gids:str) -> Set[int]:
+    gset = set()
+    for elem in gids.split(","):
+        if "-" in elem:
+            start, end = [int(s) for s in elem.split("-")]
+            gset |= set(range(start, end+1))
         else:
-            cgids.append("{}-{}".format(s, e))
-
-        return ",".join(cgids)
+            gset.add(int(elem))
+    return gset
 
 def get_args():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -101,7 +70,7 @@ def get_args():
 def main():
     args = get_args()
 
-    tool = Rasterizer(args.in_font, args.gids, args.size, args.inverse, args.rgb)
+    tool = Rasterizer(args.in_font, expand_gids(args.gids), args.size, args.inverse, args.rgb)
     sys.exit(tool.run())
 
 if __name__ == "__main__":
