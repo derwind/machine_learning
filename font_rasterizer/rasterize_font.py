@@ -19,7 +19,7 @@ class Rasterizer(object):
     def run(self):
         metrics = self.load_font_metrics()
         face = freetype.Face(self.in_font)
-        face.set_char_size(self.size*64)
+        face.set_char_size(self.size*64) # '*64' means '<<6' (bitwise shift) because type of width is F26Dot6
         for gid in self.gids:
             self.save_image(face, gid, metrics)
 
