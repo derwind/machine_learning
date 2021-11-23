@@ -10,13 +10,18 @@ from PIL import Image
 from typing import List, Set
 
 class Rasterizer(object):
-    def __init__(self, in_font:str, gids:Set[int], size:int, inverse:bool=False, rgb:bool=False, brush:bool=False):
+    def __init__(self, in_font:str, gids:Set[int], size:int, inverse:bool=False, rgb:bool=False, brush:bool=False, use_unicode_name:bool=False):
         self.in_font = in_font
         self.gids = gids
         self.size = size
         self.inverse = inverse
         self.rgb = rgb
         self.brush = brush
+        self.use_unicode_name = use_unicode_name
+        self.ttFont = TTFont(self.in_font)
+        if self.use_unicode_name:
+            self.gorder = self.ttFont.getGlyphOrder()
+            self.rcmap = self.ttFont['cmap'].buildReversed()
 
     def run(self):
         face = freetype.Face(self.in_font)
@@ -37,7 +42,7 @@ class Rasterizer(object):
         # https://github.com/freetype/freetype/blob/3cabd142ce42627a7e4410ce62616e5c4b91dc6e/src/sfnt/sfobjs.c#L1319-L1339
         # OS/2.sTypoDescender is not always adopted
         # shift = -face.descender * self.size // face.units_per_EM
-        shift = -TTFont(self.in_font)['OS/2'].sTypoDescender * self.size // face.units_per_EM
+        shift = -self.ttFont['OS/2'].sTypoDescender * self.size // face.units_per_EM
         y += shift
 
         buff = np.array(bitmap.buffer, dtype=np.ubyte).reshape((h,p))
@@ -58,6 +63,11 @@ class Rasterizer(object):
         if self.rgb:
             im = im.convert("L").convert("RGB")
         #print(np.asarray(im, np.uint8).shape)
+        if self.use_unicode_name:
+            cp = min(self.rcmap[self.gorder[gid]])
+            if cp <= 0xffff:
+                im.save(f"uni{cp:04X}.png", "PNG")
+                return
         im.save(f"g{gid}.png", "PNG")
 
 def apply_morphology(Z):
@@ -100,6 +110,7 @@ def get_args():
     parser.add_argument("--inverse", dest="inverse", action="store_true", help="inverse black and white")
     parser.add_argument("--rgb", dest="rgb", action="store_true", help="save as RGB image")
     parser.add_argument("--brush", dest="brush", action="store_true", help="clean up noises of brush")
+    parser.add_argument("--use-unicode-name", dest="use_unicode_name", action="store_true", help="use unicode based name as ones of saved images")
     parser.add_argument("in_font", metavar="IN_FONT", type=str, help="input font")
 
     args = parser.parse_args()
@@ -109,7 +120,7 @@ def get_args():
 def main():
     args = get_args()
 
-    tool = Rasterizer(args.in_font, expand_gids(args.gids), args.size, args.inverse, args.rgb, args.brush)
+    tool = Rasterizer(args.in_font, expand_gids(args.gids), args.size, args.inverse, args.rgb, args.brush, args.use_unicode_name)
     sys.exit(tool.run())
 
 if __name__ == "__main__":
