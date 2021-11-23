@@ -5,6 +5,7 @@ import sys
 import argparse
 import numpy as np
 import freetype
+from fontTools.ttLib import TTFont
 from PIL import Image
 from typing import List, Set
 
@@ -33,7 +34,10 @@ class Rasterizer(object):
         bitmap = face.glyph.bitmap
         x, y = face.glyph.bitmap_left, face.glyph.bitmap_top
         w, h, p = bitmap.width, bitmap.rows, bitmap.pitch
-        shift = -face.descender * self.size // face.units_per_EM
+        # https://github.com/freetype/freetype/blob/3cabd142ce42627a7e4410ce62616e5c4b91dc6e/src/sfnt/sfobjs.c#L1319-L1339
+        # OS/2.sTypoDescender is not always adopted
+        # shift = -face.descender * self.size // face.units_per_EM
+        shift = -TTFont(self.in_font)['OS/2'].sTypoDescender * self.size // face.units_per_EM
         y += shift
 
         buff = np.array(bitmap.buffer, dtype=np.ubyte).reshape((h,p))
