@@ -8,9 +8,17 @@ Some examples for [TensorFlow](https://www.tensorflow.org/).
 
 Some examples for [PyTorch](https://pytorch.org/).
 
+## jax
+
+Some examples for [JAX](https://jax.readthedocs.io/en/latest/).
+
 ## dezero
 
 Some examples for [DeZero](https://github.com/oreilly-japan/deep-learning-from-scratch-3).
+
+## sklearn
+
+Some examples of regression using [DecisionTree of scikit-learn](https://scikit-learn.org/stable/modules/tree.html), [XGBoost](https://xgboost.readthedocs.io/en/stable/) and [LightGBM](https://lightgbm.readthedocs.io/).
 
 ## font_rasterizer
 
