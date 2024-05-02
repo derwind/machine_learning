@@ -31,3 +31,11 @@ A model converter for VGG official params from Caffe to PyTorch.
 ## font_analysis
 
 Old researches for font recognition mainly using OCR technics.
+
+## arxiv
+
+Unofficial implementations for arXiv papers.
+
+## License
+
+[MIT License](LICENSE)
